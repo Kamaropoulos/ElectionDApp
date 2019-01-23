@@ -19,14 +19,14 @@ App = {
   },
 
   initContract: function () {
-    $.getJSON("Election.json", function(election){
+    $.getJSON("Election.json", function (election) {
       App.contracts.Election = TruffleContract(election);
       App.contracts.Election.setProvider(App.web3Provider);
       return App.render();
     });
   },
 
-  render: function(){
+  render: function () {
     var electionInstance;
     var loader = $("#loader");
     var content = $("#content");
@@ -34,41 +34,61 @@ App = {
     loader.show();
     content.hide();
 
-    web3.eth.getCoinbase(function(err, account){
-      if (err === null){
+    web3.eth.getCoinbase(function (err, account) {
+      if (err === null) {
         App.account = account;
         $("#accountAddress").html("Your Account: " + account);
       }
     });
 
-    App.contracts.Election.deployed().then(function(instance){
+    App.contracts.Election.deployed().then(function (instance) {
       electionInstance = instance;
       return electionInstance.candidatesCount();
-    }).then(function(candidatesCount){
+    }).then(function (candidatesCount) {
       var candidatesResults = $("#candidatesResults");
       candidatesResults.empty();
 
+      var candidatesSelect = $('#candidatesSelect');
+      candidatesSelect.empty();
+
       for (var i = 1; i <= candidatesCount; i++) {
-        electionInstance.candidates(i).then(function(candidate){
+        electionInstance.candidates(i).then(function (candidate) {
           var id = candidate[0];
           var name = candidate[1];
           var voteCount = candidate[2];
-
-          var candidateTemplate = "<tr><th>" + id + "</th><td>" + name + "</td><td>" + voteCount + "</td></tr>";
+          var candidateTemplate = "<tr><th>" + id + "</th><td>" + name + "</td><td>" + voteCount + "</td></tr>"
           candidatesResults.append(candidateTemplate);
+          var candidateOption = "<option value='" + id + "' >" + name + "</ option>"
+          candidatesSelect.append(candidateOption);
         });
       }
-
+      return electionInstance.voters(App.account);
+    }).then(function (hasVoted) {
+      if (hasVoted) {
+        $('form').hide();
+      }
       loader.hide();
       content.show();
-    }).catch(function(error){
+    }).catch(function (error) {
       console.warn(error);
+    });
+  },
+
+  castVote: function () {
+    var candidateId = $('#candidatesSelect').val();
+    App.contracts.Election.deployed().then(function (instance) {
+      return instance.vote(candidateId, { from: App.account });
+    }).then(function (result) {
+      $("#content").hide();
+      $("#loader").show();
+    }).catch(function (err) {
+      console.error(err);
     });
   }
 };
 
-$(function() {
-    $(window).load(function () {
-      App.init();
-    });
+$(function () {
+  $(window).load(function () {
+    App.init();
   });
+});
